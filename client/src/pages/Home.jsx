@@ -66,26 +66,40 @@ export default function Home() {
         order_id: razorpayOrderId,
         prefill: { name, contact: mobile },
         notes: { app_order_id: orderId },
+        // Prefer UPI on mobile devices; Razorpay will show UPI option first where possible.
+        method: isMobile ? { upi: true } : undefined,
         handler: async function (response) {
-          // Desktop inline success: verify on server then go to status
-          const verifyRes = await fetch("/api/payments/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              orderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok)
-            return alert(verifyData.error || "Verification failed");
-          navigate(`/status/${verifyData.id}`);
+          // On success from Razorpay, verify server-side then go to status.
+          try {
+            const verifyRes = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            const verifyData = await verifyRes.json();
+            if (!verifyRes.ok) {
+              alert(verifyData.error || "Verification failed");
+              setLoading(false);
+              return;
+            }
+            setLoading(false);
+            navigate(`/status/${verifyData.id}`);
+          } catch (err) {
+            console.error('Verification error', err);
+            alert('Verification failed');
+            setLoading(false);
+          }
         },
         modal: {
           ondismiss: function () {
+            // User dismissed the checkout (cancelled). Do not navigate to status.
             setLoading(false);
+            // Optionally let the user retry; do nothing else.
           },
         },
         theme: { color: "#2563eb" },
