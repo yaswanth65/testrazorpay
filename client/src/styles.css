@@ -1,0 +1,63 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+header {
+  margin-bottom: 16px;
+}
+h1 {
+  font-size: 24px;
+  margin: 0 0 8px;
+}
+section {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+label {
+  display: block;
+  margin: 8px 0 4px;
+}
+input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.row {
+  display: flex;
+  gap: 12px;
+}
+.row > div {
+  flex: 1;
+}
+.order {
+  border-bottom: 1px dashed #e2e8f0;
+  padding: 8px 0;
+}
+.muted {
+  color: #64748b;
+}

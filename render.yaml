@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: razorpay-mongo-demo
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: MONGO_URL
+        sync: false
+      - key: CLIENT_URL
+        value: https://razorpay-mongo-demo.onrender.com
+        sync: false

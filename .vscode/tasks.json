@@ -1,0 +1,30 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start server (npm install + dev)",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd \"server\" && npm install && npm run dev"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$eslint-stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Start client (npm install + dev)",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd \"client\" && npm install && npm run dev"
+			],
+			"isBackground": true,
+			"group": "build"
+		}
+	]
+}
