@@ -38,10 +38,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 if (process.env.NODE_ENV === 'production') {
-  // If you build client into server/public, serve it here
-  app.use(express.static(path.join(__dirname, '../../client/dist')));
+  // In Docker build we copy the client dist into server/public
+  const clientDist = path.join(__dirname, '../public');
+  app.use(express.static(clientDist));
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
+    res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
 
