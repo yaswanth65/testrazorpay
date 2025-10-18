@@ -20,7 +20,7 @@ export default function Home() {
   const [orders, setOrders] = useState([]);
   const [publicKey, setPublicKey] = useState("");
   const [upiOrderId, setUpiOrderId] = useState(null);
-  const [txnId, setTxnId] = useState('');
+  const [txnId, setTxnId] = useState("");
   const navigate = useNavigate();
 
   const isMobile = useMemo(() => {
@@ -39,7 +39,7 @@ export default function Home() {
       .then((d) => setPublicKey(d.keyId || ""));
     fetchOrders();
     // If user returned from UPI app, check for pending UPI order
-    const pending = localStorage.getItem('upi_order');
+    const pending = localStorage.getItem("upi_order");
     if (pending) setUpiOrderId(pending);
   }, []);
 
@@ -113,28 +113,35 @@ export default function Home() {
       const rzp = new window.Razorpay(options);
 
       if (isMobile) {
-        // Use direct UPI intent endpoint to open PhonePe (best-effort). Persist order id so
-        // when the user returns we can confirm the transaction.
-        const upiRes = await fetch('/api/upi/intent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, mobile }),
-        });
-        const upiData = await upiRes.json();
-        if (!upiRes.ok) throw new Error(upiData.error || 'Failed to create UPI intent');
-        const { phonepeUri, upiUri, orderId: newOrderId } = upiData;
+        // Try direct UPI intent endpoint first (only works if MERCHANT_VPA configured).
+        // If server responds that it's not configured, fall back to Razorpay checkout so
+        // the user still sees UPI/PhonePe options.
         try {
+          const upiRes = await fetch('/api/upi/intent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, mobile }),
+          });
+          const upiData = await upiRes.json();
+          if (!upiRes.ok) {
+            // fallback to Razorpay Checkout
+            console.warn('UPI intent unavailable, falling back to Razorpay checkout', upiData.error);
+            rzp.open();
+            return;
+          }
+          const { phonepeUri, upiUri, orderId: newOrderId } = upiData;
           // store pending UPI order so user can confirm after returning
           localStorage.setItem('upi_order', newOrderId);
           setUpiOrderId(newOrderId);
           // Try opening PhonePe-specific URI first, fallback to upi URI
-          window.location.href = phonepeUri || upiUri;
+          try { window.location.href = phonepeUri || upiUri; } catch (err) { console.error('Failed to open UPI app', err); }
         } catch (err) {
-          // If opening fails, still present the confirm UI
-          console.error('Failed to open UPI app', err);
+          console.error('UPI intent failed — opening Razorpay checkout', err);
+          rzp.open();
         }
       } else {
         rzp.open();
+      }
       }
     } catch (err) {
       console.error(err);
@@ -208,39 +215,50 @@ export default function Home() {
         ))}
       </section>
 
-        {upiOrderId && (
-          <section>
-            <h2>Confirm UPI Payment</h2>
-            <div className="muted">We opened your UPI app. After payment, paste the UPI transaction ID below to confirm (example: UPI123456789).</div>
-            <div style={{ marginTop: 8 }}>
-              <input value={txnId} onChange={e => setTxnId(e.target.value)} placeholder="Enter UPI txn id" />
-            </div>
-            <div style={{ marginTop: 8 }}>
-              <button onClick={async () => {
-                if (!txnId) return alert('Enter txn id');
+      {upiOrderId && (
+        <section>
+          <h2>Confirm UPI Payment</h2>
+          <div className="muted">
+            We opened your UPI app. After payment, paste the UPI transaction ID
+            below to confirm (example: UPI123456789).
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <input
+              value={txnId}
+              onChange={(e) => setTxnId(e.target.value)}
+              placeholder="Enter UPI txn id"
+            />
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <button
+              onClick={async () => {
+                if (!txnId) return alert("Enter txn id");
                 setLoading(true);
                 try {
-                  const res = await fetch('/api/upi/confirm', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                  const res = await fetch("/api/upi/confirm", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ orderId: upiOrderId, txnId }),
                   });
                   const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || 'Confirm failed');
-                  localStorage.removeItem('upi_order');
+                  if (!res.ok) throw new Error(data.error || "Confirm failed");
+                  localStorage.removeItem("upi_order");
                   setUpiOrderId(null);
-                  setTxnId('');
+                  setTxnId("");
                   setLoading(false);
                   navigate(`/status/${data.id}`);
                 } catch (err) {
                   console.error(err);
-                  alert(err.message || 'Confirm failed');
+                  alert(err.message || "Confirm failed");
                   setLoading(false);
                 }
-              }}>Confirm UPI Payment</button>
-            </div>
-          </section>
-        )}
+              }}
+            >
+              Confirm UPI Payment
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
