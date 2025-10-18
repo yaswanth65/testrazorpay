@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import './lib/db.js';
 import ordersRouter from './routes/orders.js';
 import paymentsRouter from './routes/payments.js';
+import upiRouter from './routes/upi.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.get('/api/config/public-key', (req, res) => {
 
 app.use('/api/orders', ordersRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/upi', upiRouter);
 
 // Static serve in production (optional)
 const __filename = fileURLToPath(import.meta.url);

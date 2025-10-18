@@ -19,6 +19,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
   const [publicKey, setPublicKey] = useState("");
+  const [upiOrderId, setUpiOrderId] = useState(null);
+  const [txnId, setTxnId] = useState('');
   const navigate = useNavigate();
 
   const isMobile = useMemo(() => {
@@ -36,6 +38,9 @@ export default function Home() {
       .then((r) => r.json())
       .then((d) => setPublicKey(d.keyId || ""));
     fetchOrders();
+    // If user returned from UPI app, check for pending UPI order
+    const pending = localStorage.getItem('upi_order');
+    if (pending) setUpiOrderId(pending);
   }, []);
 
   async function handleBookNow(e) {
@@ -107,30 +112,27 @@ export default function Home() {
 
       const rzp = new window.Razorpay(options);
 
-      // For mobile, use UPI intent/PhonePe redirect; Razorpay will redirect to callback URL after
       if (isMobile) {
-        // Create a custom form submit to Razorpay Checkout so it can redirect to PhonePe/UPI
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = "https://api.razorpay.com/v1/checkout/embedded";
-        const fields = {
-          key_id: publicKey,
-          order_id: razorpayOrderId,
-          name: "₹1 Product",
-          description: "Demo purchase",
-          prefill: JSON.stringify({ name, contact: mobile }),
-          callback_url: "/api/payments/callback",
-          notes: JSON.stringify({ orderId }),
-        };
-        Object.entries(fields).forEach(([k, v]) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = k;
-          input.value = v;
-          form.appendChild(input);
+        // Use direct UPI intent endpoint to open PhonePe (best-effort). Persist order id so
+        // when the user returns we can confirm the transaction.
+        const upiRes = await fetch('/api/upi/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, mobile }),
         });
-        document.body.appendChild(form);
-        form.submit();
+        const upiData = await upiRes.json();
+        if (!upiRes.ok) throw new Error(upiData.error || 'Failed to create UPI intent');
+        const { phonepeUri, upiUri, orderId: newOrderId } = upiData;
+        try {
+          // store pending UPI order so user can confirm after returning
+          localStorage.setItem('upi_order', newOrderId);
+          setUpiOrderId(newOrderId);
+          // Try opening PhonePe-specific URI first, fallback to upi URI
+          window.location.href = phonepeUri || upiUri;
+        } catch (err) {
+          // If opening fails, still present the confirm UI
+          console.error('Failed to open UPI app', err);
+        }
       } else {
         rzp.open();
       }
@@ -205,6 +207,40 @@ export default function Home() {
           </div>
         ))}
       </section>
+
+        {upiOrderId && (
+          <section>
+            <h2>Confirm UPI Payment</h2>
+            <div className="muted">We opened your UPI app. After payment, paste the UPI transaction ID below to confirm (example: UPI123456789).</div>
+            <div style={{ marginTop: 8 }}>
+              <input value={txnId} onChange={e => setTxnId(e.target.value)} placeholder="Enter UPI txn id" />
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button onClick={async () => {
+                if (!txnId) return alert('Enter txn id');
+                setLoading(true);
+                try {
+                  const res = await fetch('/api/upi/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ orderId: upiOrderId, txnId }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || 'Confirm failed');
+                  localStorage.removeItem('upi_order');
+                  setUpiOrderId(null);
+                  setTxnId('');
+                  setLoading(false);
+                  navigate(`/status/${data.id}`);
+                } catch (err) {
+                  console.error(err);
+                  alert(err.message || 'Confirm failed');
+                  setLoading(false);
+                }
+              }}>Confirm UPI Payment</button>
+            </div>
+          </section>
+        )}
     </div>
   );
 }

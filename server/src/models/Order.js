@@ -11,7 +11,8 @@ const OrderSchema = new mongoose.Schema(
     razorpayOrderId: { type: String },
     razorpayPaymentId: { type: String },
     razorpaySignature: { type: String },
-    paidAt: { type: Date },
+  paidAt: { type: Date },
+  upiTransactionId: { type: String },
   },
   { timestamps: { createdAt: true, updatedAt: true } }
 );
