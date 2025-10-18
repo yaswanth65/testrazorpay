@@ -90,8 +90,8 @@ export default function Home() {
             setLoading(false);
             navigate(`/status/${verifyData.id}`);
           } catch (err) {
-            console.error('Verification error', err);
-            alert('Verification failed');
+            console.error("Verification error", err);
+            alert("Verification failed");
             setLoading(false);
           }
         },
