@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import Order from '../models/Order.js';
-import { verifyPaymentSignature } from '../lib/razorpay.js';
+import { verifyPaymentSignature, verifyWebhookSignature } from '../lib/razorpay.js';
 
 const router = Router();
 
@@ -94,3 +94,46 @@ router.post('/callback', async (req, res) => {
 });
 
 export default router;
+
+// Webhook endpoint for Razorpay to notify about payments (recommended)
+// Configure this webhook URL in your Razorpay dashboard: /api/payments/webhook
+router.post('/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+    const raw = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body);
+    if (!signature) return res.status(400).send('Missing signature');
+
+    const ok = verifyWebhookSignature(raw, signature);
+    if (!ok) return res.status(400).send('Invalid signature');
+
+    const payload = typeof req.body === 'object' ? req.body : JSON.parse(raw);
+    const { event, payload: data } = payload;
+
+    // Handle payment events
+    if (event === 'payment.captured' || event === 'payment.authorized') {
+      const payment = data.payment.entity;
+      // Try to find order by razorpay order id
+      const orderDoc = await Order.findOne({ razorpayOrderId: payment.order_id });
+      if (orderDoc) {
+        await Order.findByIdAndUpdate(orderDoc._id, {
+          status: 'paid',
+          razorpayPaymentId: payment.id,
+          paidAt: new Date(payment.created_at * 1000),
+        });
+      }
+    } else if (event === 'payment.failed') {
+      const payment = data.payment.entity;
+      const orderDoc = await Order.findOne({ razorpayOrderId: payment.order_id });
+      if (orderDoc) {
+        await Order.findByIdAndUpdate(orderDoc._id, {
+          status: 'failed',
+        });
+      }
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Webhook error', err);
+    res.status(500).send('Webhook failed');
+  }
+});

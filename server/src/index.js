@@ -17,8 +17,9 @@ app.use(cors({
   origin: [CLIENT_URL],
   credentials: true,
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Capture raw body for webhook signature verification
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+app.use(express.urlencoded({ extended: true, verify: (req, res, buf) => { req.rawBody = buf; } }));
 
 // Health
 app.get('/api/health', (req, res) => {

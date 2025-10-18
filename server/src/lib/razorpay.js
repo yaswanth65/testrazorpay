@@ -14,3 +14,11 @@ export function verifyPaymentSignature({ orderId, paymentId, signature }) {
     .digest('hex');
   return expectedSignature === signature;
 }
+
+export function verifyWebhookSignature(rawBody, signature) {
+  const expected = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(rawBody)
+    .digest('hex');
+  return expected === signature;
+}
